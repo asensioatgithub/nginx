@@ -2790,7 +2790,7 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     rv = ngx_conf_parse(cf, NULL);
 
     *cf = pcf;
-
+    // 如果没有监听任何端口，则监听默认的 80 或 8000端口
     if (rv == NGX_CONF_OK && !cscf->listen) {
         ngx_memzero(&lsopt, sizeof(ngx_http_listen_opt_t));
 
@@ -2842,20 +2842,27 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     ngx_http_conf_ctx_t       *ctx, *pctx;
     ngx_http_core_loc_conf_t  *clcf, *pclcf;
 
+    // 先建立ngx_http_conf_ctx_t结构体
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_conf_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
     }
 
-    pctx = cf->ctx;
+    // pctx指向当前location的父级{}的配置上下文结构体，如server{}或者location{}
+    pctx = cf->ctx;  
+    // main_conf和srv_conf都将指向所属的server块下的ngx_http_conf_ct_t结构体中的main_conf和srv_conf指针数组
     ctx->main_conf = pctx->main_conf;
     ctx->srv_conf = pctx->srv_conf;
-
+    // 而loc_conf则将指向重新分配的指针数组
     ctx->loc_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
     if (ctx->loc_conf == NULL) {
         return NGX_CONF_ERROR;
     }
 
+    /* 
+        循环调用所有http模块的create_loc_conf方法，生成的loc级别的配置项结构体保存到当前
+        location的loc_conf数组中的各自ctx_index索引处
+    */ 
     for (i = 0; cf->cycle->modules[i]; i++) {
         if (cf->cycle->modules[i]->type != NGX_HTTP_MODULE) {
             continue;
@@ -2873,44 +2880,51 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     }
 
     clcf = ctx->loc_conf[ngx_http_core_module.ctx_index];
-    clcf->loc_conf = ctx->loc_conf;
+    clcf->loc_conf = ctx->loc_conf; // ???
 
     value = cf->args->elts;
 
+    // 若当前location配置指令总共有三个参数, 如: location = /test
     if (cf->args->nelts == 3) {
 
         len = value[1].len;
         mod = value[1].data;
         name = &value[2];
 
+        // 若第二个参数为 ‘=‘，则表示该 location 为完全匹配
         if (len == 1 && mod[0] == '=') {
 
             clcf->name = *name;
-            clcf->exact_match = 1;
+            clcf->exact_match = 1;  // 标志位，为 1 表示当前location为完全匹配类型
 
+        // 若第二个参数为 "^~"，如: location ^~ /static/，则表示为对 URL 路径进行前缀匹配
         } else if (len == 2 && mod[0] == '^' && mod[1] == '~') {
 
             clcf->name = *name;
-            clcf->noregex = 1;
+            clcf->noregex = 1;      // 标志位，为 1 表示不是正则匹配 
 
+        // 若第二个参数为 "~"，如：location ~ \.(gif|jpg|png|js|css)$，则表示区分大小写的正则匹配
         } else if (len == 1 && mod[0] == '~') {
 
             if (ngx_http_core_regex_location(cf, clcf, name, 0) != NGX_OK) {
                 return NGX_CONF_ERROR;
             }
 
+        // 若第二个参数为 "~*"，如：location ~* \.png$，则表示为不区分大小写的正则匹配
         } else if (len == 2 && mod[0] == '~' && mod[1] == '*') {
 
             if (ngx_http_core_regex_location(cf, clcf, name, 1) != NGX_OK) {
                 return NGX_CONF_ERROR;
             }
 
+        // 除此之外的其他情况表示错误
         } else {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "invalid location modifier \"%V\"", &value[1]);
             return NGX_CONF_ERROR;
         }
 
+    // 若当前location配置指令总共有三个参数, 如: location =/test
     } else {
 
         name = &value[1];
@@ -2956,9 +2970,11 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
             }
         }
     }
-
+    /* 获取父级（一般为 server{}或 location{}(嵌套location的情况)）下loc_conf数组中 
+     * ngx_http_core_module 模块的上下文配置结构体 */
     pclcf = pctx->loc_conf[ngx_http_core_module.ctx_index];
 
+    // 若当前的 location 位于另一个location内
     if (cf->cmd_type == NGX_HTTP_LOC_CONF) {
 
         /* nested location */
@@ -2966,7 +2982,8 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 #if 0
         clcf->prev_location = pclcf;
 #endif
-
+        /* 若父级 location 为完全匹配的情况，则表示出错，因为
+         * 精确匹配的location内不允许嵌套另一个location */
         if (pclcf->exact_match) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "location \"%V\" cannot be inside "
@@ -2975,6 +2992,10 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
             return NGX_CONF_ERROR;
         }
 
+        /* 
+         * 若父级 location 为命名 location 的情况，则同样表示错误，
+         * 因为命名 location 里也不能包含其他 location
+         */
         if (pclcf->named) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "location \"%V\" cannot be inside "
@@ -2982,7 +3003,7 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
                                &clcf->name, &pclcf->name);
             return NGX_CONF_ERROR;
         }
-
+        // 命名location只能在 server 上下文里，仅用于 server 内部跳转 
         if (clcf->named) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "named location \"%V\" can be "
@@ -3007,14 +3028,21 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
         }
     }
 
+    /* 
+     * 在对参数进行解析并区分出 location 类型以及做出有效性判断后，
+     * 将该 location 添加到父级的 locations 队列里，这里表明是当前
+     * server{} 下的所有 location 都添加到该 server{} 下的 locations 
+     * 队列中进行统一管理 
+     * */
     if (ngx_http_add_location(cf, &pclcf->locations, clcf) != NGX_OK) {
         return NGX_CONF_ERROR;
     }
 
     save = *cf;
-    cf->ctx = ctx;
-    cf->cmd_type = NGX_HTTP_LOC_CONF;
+    cf->ctx = ctx;                      // 设置配置结构体的 ctx 上下文指向当前 location{} 的上下文
+    cf->cmd_type = NGX_HTTP_LOC_CONF;   // 标记接下来解析的指令位于location{}内
 
+    // 开始解析该 location{}
     rv = ngx_conf_parse(cf, NULL);
 
     *cf = save;

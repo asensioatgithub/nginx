@@ -299,6 +299,7 @@ typedef struct {
 
 
 struct ngx_http_core_loc_conf_s {
+    // location的名称，即nginx.conf中location后的表达式(为location和‘{’之间去掉(=、^~、~)的内容)
     ngx_str_t     name;          /* location name */
 
 #if (NGX_PCRE)
@@ -324,6 +325,10 @@ struct ngx_http_core_loc_conf_s {
 #endif
 
     /* pointer to the modules' loc_conf */
+    /*
+        指向所属location块内ngx_http_conf_ctx_t结构体中的ngx_conf指针数组，
+        保存着当前location块内所有http模块create_loc_conf方法产生的结构体指针
+    */
     void        **loc_conf;
 
     uint32_t      limit_except;

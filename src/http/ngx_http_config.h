@@ -15,23 +15,39 @@
 
 
 typedef struct {
+    /* 指向一个指针数组，数组中的每个成员是由所有HTTP模块的create_main_conf方法创建的存放全局配置项的结构体，
+    它们存放着解析直属http{}块内的main级别的配置项参数*/
     void        **main_conf;
+    /* 指向一个指针数组，数组中的每个成员是由所有HTTP模块的create_srv_conf方法创建的与server相关的结构体，
+    它们或存放着main级别配置项，或存放着srv级别的配置项，这与当前的ngx_http_conf_ctx_t是在解析http{}或者server{}块时创建的有关 */
     void        **srv_conf;
+    /* 指向一个指针数组，数组中的每个成员是由所有HTTP模块的create_loc_conf方法创建的与server相关的结构体，
+    它们或存放着main级别配置项，或存放着srv级别的配置项，这与当前的ngx_http_conf_ctx_t是在解析http{}或者server{}或者location{}块时创建的有关 */
     void        **loc_conf;
 } ngx_http_conf_ctx_t;
 
 
 typedef struct {
+    /* 在解析http{}配置项前的回调函数 */
     ngx_int_t   (*preconfiguration)(ngx_conf_t *cf);
+    /* 解析完http{}配置项后的回调函数 */
     ngx_int_t   (*postconfiguration)(ngx_conf_t *cf);
 
+    /* 创建用于HTTP全局配置项的结构体，该结构体中的成员将保存直属于http{}块的配置参数项，它会在解析main配置项前调用 */
     void       *(*create_main_conf)(ngx_conf_t *cf);
+    /* 解析完main配置项后调用 */
     char       *(*init_main_conf)(ngx_conf_t *cf, void *conf);
 
+    /* 创建用于存储可同时出现在main、srv级别配置项的结构体，该结构体中的成员与server配置相关联 */
     void       *(*create_srv_conf)(ngx_conf_t *cf);
+    /* create_srv_conf产生的结构体所要解析的配置项，可能同时出现在main、srv级别中，
+    merge_srv_conf方法可以把出现在main级别中配置项值合并到srv级别配置项中 */
     char       *(*merge_srv_conf)(ngx_conf_t *cf, void *prev, void *conf);
 
+    /* 创建用于存储可同时出现在main、srv、loc级别配置项的结构体，该结构体中的成员与location配置相关联 */
     void       *(*create_loc_conf)(ngx_conf_t *cf);
+    /* create_srv_conf产生的结构体所要解析的配置项，可能同时出现在main、srv、loc级别中，
+    merge_srv_conf方法可以把出现在main级别中配置项值合并到loc级别配置项中 */
     char       *(*merge_loc_conf)(ngx_conf_t *cf, void *prev, void *conf);
 } ngx_http_module_t;
 

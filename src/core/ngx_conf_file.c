@@ -366,12 +366,12 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
     found = 0;
 
     for (i = 0; cf->cycle->modules[i]; i++) {
-
+        // 遍历模块，取得该模块的指令集
         cmd = cf->cycle->modules[i]->commands;
         if (cmd == NULL) {
             continue;
         }
-
+        // 遍历指令集是否含有该指令
         for ( /* void */ ; cmd->name.len; cmd++) {
 
             if (name->len != cmd->name.len) {
@@ -383,7 +383,7 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
             }
 
             found = 1;
-
+            // 判断模块类型cf->cycle->modules[i]是否与当前正在处理的模块类型cf->module_type匹配
             if (cf->cycle->modules[i]->type != NGX_CONF_MODULE
                 && cf->cycle->modules[i]->type != cf->module_type)
             {
@@ -391,7 +391,7 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
             }
 
             /* is the directive's location right ? */
-
+            // 判断指令类型是否匹配
             if (!(cmd->type & cf->cmd_type)) {
                 continue;
             }
@@ -459,7 +459,7 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
                     conf = confp[cf->cycle->modules[i]->ctx_index];
                 }
             }
-
+            // 执行指令对应的功能函数 set
             rv = cmd->set(cf, cmd, conf);
 
             if (rv == NGX_CONF_OK) {
