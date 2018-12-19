@@ -122,20 +122,22 @@ typedef enum {
 
 
 struct ngx_connection_s {
+    // 连接未使用时，data成员用于充当连接池中空闲链接的next指针。
+    // 当连接被使用时，data的意义由使用它的nginx模块而定。
     void               *data;
-    ngx_event_t        *read;
-    ngx_event_t        *write;
+    ngx_event_t        *read;    // 连接对应的读事件
+    ngx_event_t        *write;   // 连接对应的写事件
 
     ngx_socket_t        fd;
 
-    ngx_recv_pt         recv;
-    ngx_send_pt         send;
-    ngx_recv_chain_pt   recv_chain;
-    ngx_send_chain_pt   send_chain;
+    ngx_recv_pt         recv;       // 直接接受网络字符流的方法
+    ngx_send_pt         send;       // 直接发送网络字符流的方法
+    ngx_recv_chain_pt   recv_chain; // 以ngx_chain_t链表为参数来接收网络字符流的方法
+    ngx_send_chain_pt   send_chain; // 以ngx_chain_t链表为参数来发送网络字符流的方法
 
-    ngx_listening_t    *listening;
+    ngx_listening_t    *listening;  // 这个连接对应的listening_t监听对象
 
-    off_t               sent;
+    off_t               sent;       // 这个连接已经发送出去的字节数
 
     ngx_log_t          *log;
 
@@ -143,8 +145,8 @@ struct ngx_connection_s {
 
     int                 type;
 
-    struct sockaddr    *sockaddr;
-    socklen_t           socklen;
+    struct sockaddr    *sockaddr;   // 连接客户端的结构体
+    socklen_t           socklen;    // 连接客户端的结构体长度
     ngx_str_t           addr_text;
 
     ngx_str_t           proxy_protocol_addr;
@@ -156,16 +158,16 @@ struct ngx_connection_s {
 
     ngx_udp_connection_t  *udp;
 
-    struct sockaddr    *local_sockaddr;
+    struct sockaddr    *local_sockaddr;     // 本机中监听端口对应的socketaddr结构体，也就是listen监听对象中的socketaddr成员
     socklen_t           local_socklen;
 
-    ngx_buf_t          *buffer;
+    ngx_buf_t          *buffer;  // 用于接收和缓存客户端发来的字符流
 
     ngx_queue_t         queue;
 
-    ngx_atomic_uint_t   number;
+    ngx_atomic_uint_t   number; 
 
-    ngx_uint_t          requests;
+    ngx_uint_t          requests;    //处理请求的次数
 
     unsigned            buffered:8;
 

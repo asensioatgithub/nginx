@@ -94,9 +94,9 @@ struct io_event {
 #endif
 #endif /* NGX_TEST_BUILD_EPOLL */
 
-
+// 存储epoll模块的配置项结构体
 typedef struct {
-    ngx_uint_t  events;
+    ngx_uint_t  events;    
     ngx_uint_t  aio_requests;
 } ngx_epoll_conf_t;
 
@@ -158,7 +158,7 @@ static ngx_str_t      epoll_name = ngx_string("epoll");
 
 static ngx_command_t  ngx_epoll_commands[] = {
 
-    { ngx_string("epoll_events"),
+    { ngx_string("epoll_events"),   // 表示调用一次epoll_wait时最多可以返回的事件数
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
       0,
@@ -323,12 +323,15 @@ static ngx_int_t
 ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
 {
     ngx_epoll_conf_t  *epcf;
-
+    // 获取create_conf中生成的ngx_epoll_conf_t结构体，它已经被赋予解析完配置文件后的值。
     epcf = ngx_event_get_conf(cycle->conf_ctx, ngx_epoll_module);
 
     if (ep == -1) {
-        ep = epoll_create(cycle->connection_n / 2);
-
+        /**
+         * 调用epoll_create 在内核中创建epoll对象。容量为总连接数的一半（具体数目并无影响）
+        */
+        ep = epoll_create(cycle->connection_n / 2); ）
+        
         if (ep == -1) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
                           "epoll_create() failed");
@@ -354,7 +357,7 @@ ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
         if (event_list) {
             ngx_free(event_list);
         }
-
+        // 初始化event_list数组，数组的个数是配置项epoll_event的参数
         event_list = ngx_alloc(sizeof(struct epoll_event) * epcf->events,
                                cycle->log);
         if (event_list == NULL) {
@@ -369,7 +372,7 @@ ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
     ngx_event_actions = ngx_epoll_module_ctx.actions;
 
 #if (NGX_HAVE_CLEAR_EVENT)
-    ngx_event_flags = NGX_USE_CLEAR_EVENT
+    ngx_event_flags = NGX_USE_CLEAR_EVENT   // 默认采用ET模式来使用epoll，NGX_USE_CLEAR_EVENT宏实际上就是告诉Nginx使用ET模式。
 #else
     ngx_event_flags = NGX_USE_LEVEL_EVENT
 #endif

@@ -220,8 +220,8 @@
 
 
 struct ngx_module_s {
-    ngx_uint_t            ctx_index;
-    ngx_uint_t            index;
+    ngx_uint_t            ctx_index; // 该模块在同种模块中的序号。
+    ngx_uint_t            index;     // 模块在ngx_modules.c文件中的ngx_modules数组的序号。
 
     char                 *name;
 

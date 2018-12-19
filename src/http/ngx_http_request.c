@@ -932,7 +932,9 @@ ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg)
 
 #endif
 
-
+/**
+ * 解析请求行
+ */
 static void
 ngx_http_process_request_line(ngx_event_t *rev)
 {
@@ -947,7 +949,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0,
                    "http process request line");
-
+    // 判断是否是超时事件，如果是的话，则关闭这个请求和连接；否则开始正常的解析流程。
     if (rev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
         c->timedout = 1;
@@ -955,6 +957,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
         return;
     }
 
+    // NGX_AGAIN — Operation incomplete; call the function again.
     rc = NGX_AGAIN;
 
     for ( ;; ) {
@@ -967,6 +970,15 @@ ngx_http_process_request_line(ngx_event_t *rev)
             }
         }
 
+        /**
+         * 如果ngx_http_read_request_header函数正常的读取到了数据，
+         * 函数将调用ngx_http_parse_request_line函数来解析
+         * 这个函数根据http协议规范中对请求行的定义实现了一个有限状态机，经过这个状态机，
+         * nginx会记录请求行中的请求方法（Method），请求uri以及http协议版本在缓冲区中的起始位置，
+         * 在解析过程中还会记录一些其他有用的信息，以便后面的处理过程中使用。
+         * 如果解析请求行的过程中没有产生任何问题，该函数会返回NGX_OK；
+         * 如果请求行不满足协议规范，该函数会立即终止解析过程，并返回相应错误号；
+        */
         rc = ngx_http_parse_request_line(r, r->header_in);
 
         if (rc == NGX_OK) {
@@ -1058,11 +1070,12 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
             ngx_log_error(NGX_LOG_INFO, c->log, 0,
                           ngx_http_client_errors[rc - NGX_HTTP_CLIENT_ERROR]);
-
+                // 当服务器不支持请求中所使用的HTTP协议版本时，返回505错误，表示“HTTP版本不受支持”，。
             if (rc == NGX_HTTP_PARSE_INVALID_VERSION) {
                 ngx_http_finalize_request(r, NGX_HTTP_VERSION_NOT_SUPPORTED);
 
             } else {
+                // 如果ngx_http_parse_request_line函数返回了错误，则直接给客户端返回400错误
                 ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
             }
 
@@ -1070,7 +1083,13 @@ ngx_http_process_request_line(ngx_event_t *rev)
         }
 
         /* NGX_AGAIN: a request line parsing is still incomplete */
-
+        /**
+         * 如果返回NGX_AGAIN，则需要判断一下是否是由于缓冲区空间不够，还是已读数据不够。
+         * 如果是缓冲区大小不够了，nginx会调用ngx_http_alloc_large_header_buffer函数来分配另一块大缓冲区，
+         * 如果大缓冲区还不够装下整个请求行，nginx则会返回414错误给客户端，
+         * 否则分配了更大的缓冲区并拷贝之前的数据之后，
+         * 继续调用ngx_http_read_request_header函数读取数据来进入请求行自动机处理，直到请求行解析结束；
+        */
         if (r->header_in->pos == r->header_in->end) {
 
             rv = ngx_http_alloc_large_header_buffer(r, 1);
@@ -1086,6 +1105,8 @@ ngx_http_process_request_line(ngx_event_t *rev)
 
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
                               "client sent too long URI");
+                // 414status code:
+                // 请求的URI长度超过了服务器能够解释的长度，因此服务器拒绝对该请求提供服务。
                 ngx_http_finalize_request(r, NGX_HTTP_REQUEST_URI_TOO_LARGE);
                 break;
             }

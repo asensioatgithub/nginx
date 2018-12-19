@@ -1325,10 +1325,14 @@ ngx_http_core_find_location(ngx_http_request_t *r)
 #endif
 
         /* look up nested locations */
-
+        // 调用ngx_http_core_find_location检测一次是否有嵌套的location，有则覆盖原找到的location作为最终匹配的location。
         rc = ngx_http_core_find_location(r);
     }
 
+    /**
+     * NGX_OK     - exact or regex match
+     * NGX_DONE   - auto redirect
+    */
     if (rc == NGX_OK || rc == NGX_DONE) {
         return rc;
     }
@@ -1399,18 +1403,20 @@ ngx_http_core_find_static_location(ngx_http_request_t *r,
                        "test location: \"%*s\"",
                        (size_t) node->len, node->name);
 
+        // n是uri的长度和node name长度的最小值，好比较他们的交集
         n = (len <= (size_t) node->len) ? len : node->len;
-
+        // 比较uri和node 的name交集
         rc = ngx_filename_cmp(uri, node->name, n);
-
+        // rc不为0表示uri和node的name不相等，这时候三叉树就能加速查找的效率，选择node的左节点或者右节点
         if (rc != 0) {
             node = (rc < 0) ? node->left : node->right;
 
             continue;
         }
 
+        // 如果交集相等，如果uri的长度比node的长度还要长
         if (len > (size_t) node->len) {
-
+            // 如果这个节点是前缀匹配的那种需要递归tree节点，因为tree节点后面的子节点拥有相同的前缀。
             if (node->inclusive) {
 
                 r->loc_conf = node->inclusive->loc_conf;
@@ -1424,12 +1430,12 @@ ngx_http_core_find_static_location(ngx_http_request_t *r,
             }
 
             /* exact only */
-
+            // 没有前缀匹配的location说明该节点是精确匹配，因长度不能所以不匹配，递归遍历右子树。
             node = node->right;
 
             continue;
         }
-
+        // 如果uri的长度等于node->name的长度，已经匹配，有精确匹配的location先返回，否则返回前缀匹配的location。
         if (len == (size_t) node->len) {
 
             if (node->exact) {
@@ -2895,7 +2901,7 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
         if (len == 1 && mod[0] == '=') {
 
             clcf->name = *name;
-            clcf->exact_match = 1;  // 标志位，为 1 表示当前location为完全匹配类型
+            clcf->exact_match = 1;  // 标志位，为 1 表示当前location为精确匹配类型
 
         // 若第二个参数为 "^~"，如: location ^~ /static/，则表示为对 URL 路径进行前缀匹配
         } else if (len == 2 && mod[0] == '^' && mod[1] == '~') {
@@ -3030,9 +3036,7 @@ ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 
     /* 
      * 在对参数进行解析并区分出 location 类型以及做出有效性判断后，
-     * 将该 location 添加到父级的 locations 队列里，这里表明是当前
-     * server{} 下的所有 location 都添加到该 server{} 下的 locations 
-     * 队列中进行统一管理 
+     * 将该 location 添加到父级的 locations 队列里。
      * */
     if (ngx_http_add_location(cf, &pclcf->locations, clcf) != NGX_OK) {
         return NGX_CONF_ERROR;

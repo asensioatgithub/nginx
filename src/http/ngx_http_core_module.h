@@ -266,15 +266,20 @@ typedef struct {
 
 
 typedef struct {
+    // 地址协议蔟
     ngx_int_t                  family;
+    // 端口号
     in_port_t                  port;
+    // 该端口下对应着的所有ngx_http_conf_addr_t地址 
     ngx_array_t                addrs;     /* array of ngx_http_conf_addr_t */
 } ngx_http_conf_port_t;
 
 
 typedef struct {
+    // 监听套接字的各种属性
     ngx_http_listen_opt_t      opt;
 
+    // 以下三个散列表用于确定到底使用哪个server{}虚拟主机下的配置来处理端口上的新连接
     ngx_hash_t                 hash;
     ngx_hash_wildcard_t       *wc_head;
     ngx_hash_wildcard_t       *wc_tail;
@@ -286,6 +291,7 @@ typedef struct {
 
     /* the default server configuration for this address:port */
     ngx_http_core_srv_conf_t  *default_server;
+    // 每个元素都指向ngx_http_core_srv_conf_t结构体，用于将监听端口和server{}虚拟主机关联起来
     ngx_array_t                servers;  /* array of ngx_http_core_srv_conf_t */
 } ngx_http_conf_addr_t;
 
@@ -447,9 +453,13 @@ struct ngx_http_core_loc_conf_s {
 
 
 typedef struct {
+    // 通过ngx_queue_t对象queue，将所有ngx_http_location_queue_t串联起来
     ngx_queue_t                      queue;
+    //如果location中的字符串可以精确匹配，exact将指向对应的ngx_http_core_loc_conf_t结构体，否则为NULL
     ngx_http_core_loc_conf_t        *exact;
+    //如果location中的字符串无法精确匹配，inclusive将指向对应的ngx_http_core_conf_t结构体，否则为NULL
     ngx_http_core_loc_conf_t        *inclusive;
+    //指向location的名称
     ngx_str_t                       *name;
     u_char                          *file_name;
     ngx_uint_t                       line;

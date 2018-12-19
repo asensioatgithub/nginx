@@ -284,6 +284,7 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+    // 初始化所有模块的index和name。
     if (ngx_preinit_modules() != NGX_OK) {
         return 1;
     }

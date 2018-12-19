@@ -436,17 +436,17 @@ extern ngx_os_io_t  ngx_io;
 #define NGX_EVENT_MODULE      0x544E5645  /* "EVNT" */
 #define NGX_EVENT_CONF        0x02000000
 
-
+// 用于存储配置项参数
 typedef struct {
-    ngx_uint_t    connections;
-    ngx_uint_t    use;
+    ngx_uint_t    connections;   // 连接池的大小
+    ngx_uint_t    use;           // 选用的事件模块在所有事件模块中的序号，即ctx_index成员。
 
-    ngx_flag_t    multi_accept;
-    ngx_flag_t    accept_mutex;
+    ngx_flag_t    multi_accept;  // 标识为，如果为1，则表示在接受到一个连接事件时，一次性建立尽可能多的连接
+    ngx_flag_t    accept_mutex;  // 标识为，为1时表示启用负载均衡锁
 
     ngx_msec_t    accept_mutex_delay;
 
-    u_char       *name;
+    u_char       *name;     // 所选用事件模块的名字，它与use成员是匹配的
 
 #if (NGX_DEBUG)
     ngx_array_t   debug_connection;
@@ -456,10 +456,11 @@ typedef struct {
 
 typedef struct {
     ngx_str_t              *name;
-
+    // 在解析配置项前，这个回调方法用于创建存储配置项参数的结构体
     void                 *(*create_conf)(ngx_cycle_t *cycle);
+    // 在解析配置项后，init_conf方法会被调用，用于综合处理当前事件模块感兴趣的全部配置项
     char                 *(*init_conf)(ngx_cycle_t *cycle, void *conf);
-
+    // 对于事件驱动机制，每个事件模块需要实现的10个抽象方法
     ngx_event_actions_t     actions;
 } ngx_event_module_t;
 
